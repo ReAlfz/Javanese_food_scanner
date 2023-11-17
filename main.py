@@ -5,9 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential, load_model
-from keras.optimizers import Adam
+from keras.optimizers import SGD, Adam
 from keras.preprocessing import image
-from keras.layers import Dense, GlobalAveragePooling2D
+from keras.layers import Dense, GlobalAveragePooling2D, BatchNormalization, Dropout
 from keras.losses import CategoricalCrossentropy
 from keras.applications import MobileNet
 import cv2 as cv2
@@ -20,12 +20,18 @@ def make_to_jpeg(src_dir):
     if not os.path.exists(output):
         os.mkdir(output)
 
+    label_mapping = {}  # Mapping from class names to numerical labels
+    label_counter = 0
+
     for class_dir in os.listdir(src_dir):
         class_path = os.path.join(src_dir, class_dir)
         dest_class_path = os.path.join(output, class_dir)
 
         if not os.path.exists(dest_class_path):
             os.mkdir(dest_class_path)
+
+        label_mapping[class_dir] = label_counter
+        label_counter += 1
 
         for item in os.listdir(class_path):
             item_path = os.path.join(class_path, item)
@@ -41,6 +47,7 @@ def make_to_jpeg(src_dir):
                 if not os.path.exists(dest_path):
                     cv2.imwrite(dest_path, image)
     print('Convert and resize done')
+    return label_mapping
 
 
 def split_dataset(dir):
@@ -102,18 +109,18 @@ def split_dataset(dir):
     print('Split Dataset Done')
 
 
-def preprocessing():
+def preprocessing(label_mapping):
     dir = 'Dataset/final'
 
     # ** check images **
-    fig, axs = plt.subplots(1, 3)
-    for i, class_name in enumerate(os.listdir(f'{dir}/train')):
-        folder_path = f'{dir}/train/{class_name}'
-        img_path = f'{folder_path}/{os.listdir(folder_path)[0]}'
-        img = plt.imread(img_path)
-        axs[i].imshow(img)
-        axs[i].set_title(class_name)
-    plt.show()
+    # fig, axs = plt.subplots(1, 4)
+    # for i, class_name in enumerate(os.listdir(f'{dir}/train')):
+    #     folder_path = f'{dir}/train/{class_name}'
+    #     img_path = f'{folder_path}/{os.listdir(folder_path)[0]}'
+    #     img = plt.imread(img_path)
+    #     axs[i].imshow(img)
+    #     axs[i].set_title(class_name)
+    # plt.show()
 
     datagen = ImageDataGenerator(rescale=1/255)
 
@@ -122,7 +129,8 @@ def preprocessing():
         target_size=(128, 128),
         color_mode='rgb',
         class_mode='categorical',
-        shuffle=True
+        shuffle=True,
+        classes=list(label_mapping.keys())
     )
 
     val_generator = datagen.flow_from_directory(
@@ -130,7 +138,8 @@ def preprocessing():
         target_size=(128, 128),
         color_mode='rgb',
         class_mode='categorical',
-        shuffle=False
+        shuffle=False,
+        classes=list(label_mapping.keys())
     )
 
     test_generator = datagen.flow_from_directory(
@@ -149,12 +158,14 @@ def modeling(train_generator, val_generator):
     model = Sequential([
         pre_train,
         GlobalAveragePooling2D(),
-        Dense(512, activation='relu'),
-        Dense(15, activation='softmax')
+        BatchNormalization(),
+        Dense(128, activation='relu'),
+        Dense(4, activation='softmax')
     ])
 
     model.compile(
         optimizer=Adam(learning_rate=0.0001),
+        # optimizer=SGD(learning_rate=0.001, momentum=0.9),
         loss=CategoricalCrossentropy(),
         metrics=['acc']
     )
@@ -191,14 +202,12 @@ def predict(test_generator):
 
 
 if __name__ == '__main__':
-    # ** convert all image to jpeg and resize **
-    # dir_ = 'Dataset/data/'
-    # make_to_jpeg(dir_)
-    #
-    # ** split dataset to train, val, and test **
+    dir_ = 'Dataset/data'
+    label_map = make_to_jpeg(dir_)
+
     # dir2_ = 'Dataset/food_city'
     # split_dataset(dir2_)
 
-    train_generator_, val_generator_, test_generator_ = preprocessing()
-    # # history_ = modeling(train_generator_, val_generator_)
+    train_generator_, val_generator_, test_generator_ = preprocessing(label_map)
+    history_ = modeling(train_generator_, val_generator_)
     # predict(test_generator_)
