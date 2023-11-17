@@ -3,6 +3,8 @@ import shutil
 import numpy as np
 
 import matplotlib.pyplot as plt
+import sns as sns
+from sklearn.metrics import confusion_matrix
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential, load_model
 from keras.optimizers import SGD, Adam
@@ -12,6 +14,8 @@ from keras.losses import CategoricalCrossentropy
 from keras.applications import MobileNet
 import cv2 as cv2
 import os
+
+from sklearn.metrics import classification_report
 
 
 def make_to_jpeg(src_dir):
@@ -181,6 +185,56 @@ def modeling(train_generator, val_generator):
     return history
 
 
+def evaluate(history, test_generator):
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    epochs = range(len(acc))
+
+    plt.figure(figsize=(12, 6))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, acc, 'b', label='Training accuracy')
+    plt.plot(epochs, val_acc, 'g', label='Validation accuracy')
+    plt.title('Training and Validation Accuracy')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, loss, 'b', label='Training loss')
+    plt.plot(epochs, val_loss, 'g', label='Validation loss')
+    plt.title('Training and Validation Loss')
+    plt.legend()
+
+    plt.show()
+
+    # Load the model
+    model = load_model('model.h5')
+
+    # Generate predictions
+    predictions = model.predict(test_generator)
+    y_pred = np.argmax(predictions, axis=-1)
+
+    # Get true labels
+    true_labels = test_generator.classes
+
+    # Get class names
+    class_names = list(test_generator.class_indices.keys())
+
+    # Display classification report
+    print("Classification Report:")
+    print(classification_report(true_labels, y_pred, target_names=class_names))
+
+    # Plot confusion matrix
+    cm = confusion_matrix(true_labels, y_pred)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    plt.title('Confusion Matrix')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.show()
+
+
 def predict(test_generator):
     model = load_model('model.h5')
     predictions = model.predict(test_generator)
@@ -210,4 +264,5 @@ if __name__ == '__main__':
 
     train_generator_, val_generator_, test_generator_ = preprocessing(label_map)
     history_ = modeling(train_generator_, val_generator_)
+    evaluate(history_, test_generator_)
     # predict(test_generator_)
