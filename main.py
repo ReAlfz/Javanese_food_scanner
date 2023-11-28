@@ -7,12 +7,10 @@ from sklearn.metrics import confusion_matrix
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential, load_model
 from keras.optimizers import Adam
-from keras.preprocessing import image
 from keras.layers import Dense, GlobalAveragePooling2D, BatchNormalization, Conv2D, MaxPooling2D, Flatten
 from keras.losses import CategoricalCrossentropy
 from keras.applications import MobileNet
 from sklearn.metrics import classification_report
-import tensorflow as tf
 
 
 def make_to_jpeg(src_dir):
@@ -180,6 +178,7 @@ def modeling_deeplearning(train_generator, val_generator):
         epochs=10,
     )
 
+    model.compile()
     model.save('deeplearning_model.h5')
 
     acc = history.history['acc']
@@ -230,6 +229,7 @@ def modeling_with_pretrain(train_generator, val_generator):
         epochs=10,
     )
 
+    model.compile()
     model.save('pretrain_model.h5')
 
     acc = history.history['acc']
@@ -276,8 +276,8 @@ def evaluate(test_generator, role):
     plt.show()
 
 
-def predict(test_generator, role):
-    model = load_model(role)
+def predict(test_generator, role_):
+    model = load_model(role_)
     predictions = model.predict(test_generator)
     class_label = test_generator.class_indices
     predicted_label = [list(class_label.keys())[np.argmax(pred)] for pred in predictions]
