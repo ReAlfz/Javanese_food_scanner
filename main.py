@@ -10,7 +10,8 @@ from keras.optimizers import Adam
 from keras.layers import Dense, GlobalAveragePooling2D, BatchNormalization, Conv2D, MaxPooling2D, Flatten
 from keras.losses import CategoricalCrossentropy
 from keras.applications import MobileNet
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.ensemble import RandomForestClassifier
 
 
 def make_to_jpeg(src_dir):
@@ -204,6 +205,14 @@ def modeling_deeplearning(train_generator, val_generator):
     plt.show()
     return 'deeplearning_model.h5'
 
+def data_reshape(generator):
+    # Reshape data
+    x_data = np.concatenate([generator.next()[0] for _ in range(len(generator))])
+    nsamples, nx, ny, nrgb = x_data.shape
+    x_data = x_data.reshape((nsamples, nx * ny * nrgb))
+
+    return x_data, generator.labels
+
 
 def modeling_with_pretrain(train_generator, val_generator):
     pre_train = MobileNet(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
@@ -255,6 +264,11 @@ def modeling_with_pretrain(train_generator, val_generator):
     plt.show()
     return 'pretrain_model.h5'
 
+def modelling_classic(train_data, train_labels):
+    model = RandomForestClassifier()
+    model.fit(train_data, train_labels)
+    return model
+
 
 def evaluate(test_generator, role):
     model = load_model(role)
@@ -274,6 +288,13 @@ def evaluate(test_generator, role):
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.show()
+
+def evaluate_classic(validation_data, validation_labels, role):
+    y_pred = role.predict(validation_data)
+    acc = accuracy_score(y_pred, validation_labels)
+    clf_report = classification_report(y_pred,validation_labels)
+    print(f'\nAccuracy score:\n{acc}\n')
+    print(f'Classification report:\n{clf_report}')
 
 
 def predict(test_generator, role_):
