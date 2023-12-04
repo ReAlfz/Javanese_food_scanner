@@ -1,21 +1,13 @@
+import deeplearning, pretrain, classic
 import random, shutil, os
-import numpy as np
+from sklearn.model_selection import train_test_split
 import cv2 as cv2
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import confusion_matrix
 from keras.preprocessing.image import ImageDataGenerator
-from keras.models import Sequential, load_model
-from keras.optimizers import Adam
-from keras.layers import Dense, GlobalAveragePooling2D, BatchNormalization, Conv2D, MaxPooling2D, Flatten
-from keras.losses import CategoricalCrossentropy
-from keras.applications import MobileNet
-from sklearn.metrics import classification_report, accuracy_score
-from sklearn.ensemble import RandomForestClassifier
 
 
 def make_to_jpeg(src_dir):
     output = 'Dataset/food_city'
+    x, y = [], []
 
     if not os.path.exists(output):
         os.mkdir(output)
@@ -46,8 +38,11 @@ def make_to_jpeg(src_dir):
                 image = cv2.resize(image, (128, 128))
                 if not os.path.exists(dest_path):
                     cv2.imwrite(dest_path, image)
+
+                x.append(image.flatten())
+                y.append(class_dir)
     print('Convert and resize done')
-    return label_mapping
+    return x, y, label_mapping
 
 
 def split_dataset(dir):
@@ -152,180 +147,21 @@ def preprocessing(label_mapping):
     return train_generator, val_generator, test_generator
 
 
-def modeling_deeplearning(train_generator, val_generator):
-    model = Sequential([
-        Conv2D(64, kernel_size=3, activation='relu', input_shape=(128, 128, 3)),
-        MaxPooling2D(2, 2),
-        BatchNormalization(),
-        Conv2D(64, kernel_size=3, activation='relu'),
-        MaxPooling2D(2, 2),
-        Conv2D(32, kernel_size=3, activation='relu'),
-        MaxPooling2D(2, 2),
-        Flatten(),
-        Dense(32, activation='relu'),
-        Dense(4, activation='softmax')
-    ])
-
-    model.compile(
-        optimizer=Adam(learning_rate=0.0001),
-        loss=CategoricalCrossentropy(),
-        metrics=['acc']
-    )
-
-    model.summary()
-    history = model.fit(
-        train_generator,
-        validation_data=val_generator,
-        epochs=10,
-    )
-
-    model.compile()
-    model.save('deeplearning_model.h5')
-
-    acc = history.history['acc']
-    val_acc = history.history['val_acc']
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
-    epochs = range(len(acc))
-
-    plt.figure(figsize=(12, 6))
-
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, acc, 'b', label='Training accuracy')
-    plt.plot(epochs, val_acc, 'g', label='Validation accuracy')
-    plt.title('Training and Validation Accuracy')
-    plt.legend()
-
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, loss, 'b', label='Training loss')
-    plt.plot(epochs, val_loss, 'g', label='Validation loss')
-    plt.title('Training and Validation Loss')
-    plt.legend()
-
-    plt.show()
-    return 'deeplearning_model.h5'
-
-def data_reshape(generator):
-    # Reshape data
-    x_data = np.concatenate([generator.next()[0] for _ in range(len(generator))])
-    nsamples, nx, ny, nrgb = x_data.shape
-    x_data = x_data.reshape((nsamples, nx * ny * nrgb))
-
-    return x_data, generator.labels
-
-
-def modeling_with_pretrain(train_generator, val_generator):
-    pre_train = MobileNet(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
-    pre_train.trainable = False
-    model = Sequential([
-        pre_train,
-        GlobalAveragePooling2D(),
-        BatchNormalization(),
-        Dense(128, activation='relu'),
-        Dense(4, activation='softmax')
-    ])
-
-    model.compile(
-        optimizer=Adam(learning_rate=0.0001),
-        loss=CategoricalCrossentropy(),
-        metrics=['acc']
-    )
-
-    model.summary()
-    history = model.fit(
-        train_generator,
-        validation_data=val_generator,
-        epochs=10,
-    )
-
-    model.compile()
-    model.save('pretrain_model.h5')
-
-    acc = history.history['acc']
-    val_acc = history.history['val_acc']
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
-    epochs = range(len(acc))
-
-    plt.figure(figsize=(12, 6))
-
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, acc, 'b', label='Training accuracy')
-    plt.plot(epochs, val_acc, 'g', label='Validation accuracy')
-    plt.title('Training and Validation Accuracy')
-    plt.legend()
-
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, loss, 'b', label='Training loss')
-    plt.plot(epochs, val_loss, 'g', label='Validation loss')
-    plt.title('Training and Validation Loss')
-    plt.legend()
-
-    plt.show()
-    return 'pretrain_model.h5'
-
-def modelling_classic(train_data, train_labels):
-    model = RandomForestClassifier()
-    model.fit(train_data, train_labels)
-    return model
-
-
-def evaluate(test_generator, role):
-    model = load_model(role)
-    predictions = model.predict(test_generator)
-    y_pred = np.argmax(predictions, axis=-1)
-
-    true_labels = test_generator.classes
-    class_names = list(test_generator.class_indices.keys())
-
-    print("Classification Report:")
-    print(classification_report(true_labels, y_pred, target_names=class_names))
-
-    cm = confusion_matrix(true_labels, y_pred)
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-    plt.title('Confusion Matrix')
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.show()
-
-def evaluate_classic(validation_data, validation_labels, role):
-    y_pred = role.predict(validation_data)
-    acc = accuracy_score(y_pred, validation_labels)
-    clf_report = classification_report(y_pred,validation_labels)
-    print(f'\nAccuracy score:\n{acc}\n')
-    print(f'Classification report:\n{clf_report}')
-
-
-def predict(test_generator, role_):
-    model = load_model(role_)
-    predictions = model.predict(test_generator)
-    class_label = test_generator.class_indices
-    predicted_label = [list(class_label.keys())[np.argmax(pred)] for pred in predictions]
-
-    # for i, (image_path, true_label) in enumerate(zip(test_generator.filepaths, test_generator.filenames)):
-    #     img = image.load_img(image_path, target_size=(128, 128))
-    #     img = image.img_to_array(img)
-    #     img = img / 255.0  # Normalize the image data
-    #
-    #     print(f"Image {i+1}:")
-    #     print(f"True Label: {true_label}")
-    #     print(f"Predicted Label: {predicted_label[i]}\n")
-    #
-    #     plt.imshow(img)
-    #     plt.axis('off')
-    #     plt.show()
-
-
 if __name__ == '__main__':
     dir_ = 'Dataset/data'
-    label_map = make_to_jpeg(dir_)
+    x, y, label_map = make_to_jpeg(dir_)
 
     # dir2_ = 'Dataset/food_city'
     # split_dataset(dir2_)
 
     train_generator_, val_generator_, test_generator_ = preprocessing(label_map)
-    # role = modeling_with_pretrain(train_generator_, val_generator_)
-    role = modeling_deeplearning(train_generator_, val_generator_)
-    evaluate(test_generator_, role)
-    # predict(test_generator_, role)
+
+    # DeepLearning metode
+    # pretrain.modeling(train_generator_, val_generator_)
+    # deeplearning.modeling(train_generator_, val_generator_)
+
+    # Classic metode
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.1)
+    svc = classic.modelling(x_train, y_train)
+    classic.evaluate(x_test, y_test, svc)
+
