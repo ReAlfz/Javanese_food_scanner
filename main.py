@@ -1,4 +1,5 @@
 import deeplearning, pretrain, classic
+from sklearn.preprocessing import StandardScaler
 import random, shutil, os
 from sklearn.model_selection import train_test_split
 import cv2 as cv2
@@ -161,6 +162,8 @@ if __name__ == '__main__':
     # deeplearning.modeling(train_generator_, val_generator_)
 
     # Classic metode
+    scaler = StandardScaler()
+    x = scaler.fit_transform(x)
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.1)
     svc = classic.modelling(x_train, y_train)
     classic.evaluate(x_test, y_test, svc)
